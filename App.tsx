@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AngerMeter from './AngerMeter';
 import LearnReference from './LearnReference';
+import SurveyForm, { SurveyData, QUESTIONS } from './SurveyForm';
 import { startSimulation, sendStudentResponse, generateProctorReport, ScenarioType, SimulationState, ReportData } from './geminiService';
 
 // Declaration for the global jsPDF object added via CDN
@@ -27,6 +28,7 @@ const App: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<ReportData | null>(null);
+  const [surveyData, setSurveyData] = useState<SurveyData | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -43,6 +45,7 @@ const App: React.FC = () => {
     setScenario(selectedScenario);
     setPhase('SIMULATION');
     setMessages([]);
+    setSurveyData(null); // Reset survey for new game
     
     // Initial call to AI
     const state = await startSimulation(selectedScenario);
@@ -101,6 +104,32 @@ const App: React.FC = () => {
     setMessages([]);
     setReport(null);
     setInput('');
+    setSurveyData(null);
+  };
+
+  const sendSurveyToInstructor = (data: SurveyData) => {
+    const subject = "Recovery Room Survey Completion";
+    const body = `
+Student Survey Responses:
+-------------------------
+1. Strategic Thinking: ${data.q1}/5
+2. Epistemic Vigilance: ${data.q2}/5
+3. Intellectual Autonomy: ${data.q3}/5
+4. Perceived Usefulness: ${data.q4}/5
+5. Perceived Ease of Use: ${data.q5}/5
+
+REFLECTION:
+${data.q6}
+    `.trim();
+    
+    // Construct mailto link
+    // Note: window.location.href is standard for triggering mail clients without opening a blank tab
+    window.location.href = `mailto:bbambilla@arden.ac.uk?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const handleSurveySubmit = (data: SurveyData) => {
+    sendSurveyToInstructor(data);
+    setSurveyData(data);
   };
 
   const downloadPDF = () => {
@@ -175,7 +204,51 @@ const App: React.FC = () => {
       }
     });
 
-    // 5. Footer
+    // 5. Survey Results (Self-Reflection Audit)
+    if (surveyData) {
+      doc.addPage();
+      
+      doc.setFillColor(17, 24, 39); 
+      doc.rect(0, 0, 210, 30, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Self-Reflection Audit (Meta-TAM)", 14, 20);
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      
+      let yPos = 45;
+      
+      const printQuestionScore = (qText: string, score: number) => {
+        doc.setFont("helvetica", "bold");
+        const lines = doc.splitTextToSize(qText, 170);
+        doc.text(lines, 14, yPos);
+        yPos += (lines.length * 5) + 2;
+        
+        doc.setFont("helvetica", "normal");
+        doc.text(`Student Rating: ${score}/5`, 14, yPos);
+        yPos += 10;
+      };
+
+      printQuestionScore(`1. Strategic Thinking: ${QUESTIONS.q1}`, surveyData.q1);
+      printQuestionScore(`2. Epistemic Vigilance: ${QUESTIONS.q2}`, surveyData.q2);
+      printQuestionScore(`3. Intellectual Autonomy: ${QUESTIONS.q3}`, surveyData.q3);
+      printQuestionScore(`4. Perceived Usefulness: ${QUESTIONS.q4}`, surveyData.q4);
+      printQuestionScore(`5. Perceived Ease of Use: ${QUESTIONS.q5}`, surveyData.q5);
+
+      yPos += 5;
+      doc.setFont("helvetica", "bold");
+      doc.text("6. Reflection on AI Advice:", 14, yPos);
+      yPos += 7;
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(60, 60, 60);
+      const reflectionLines = doc.splitTextToSize(surveyData.q6, 180);
+      doc.text(reflectionLines, 14, yPos);
+    }
+
+    // 6. Footer
     const pageHeight = doc.internal.pageSize.height;
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
@@ -222,12 +295,15 @@ const App: React.FC = () => {
       ) : (
         <>
           {/* 1. Header & Anger Meter */}
-          <AngerMeter level={angerLevel} onBack={resetApp} />
+          {phase === 'SIMULATION' && <AngerMeter level={angerLevel} onBack={resetApp} />}
+          {phase === 'PROCTOR' && <AngerMeter level={angerLevel} />} {/* Hide back button in proctor mode */}
 
-          {/* 2. Chat Area */}
+          {/* 2. Chat Area (Hidden in Proctor Mode until Survey Done if desired, but here we replace it) */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-32">
             <div className="max-w-3xl mx-auto space-y-6">
-              {messages.map((m, idx) => (
+              
+              {/* Only show messages in SIMULATION phase */}
+              {phase === 'SIMULATION' && messages.map((m, idx) => (
                 <div key={idx} className="flex flex-col gap-2">
                   <div className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div 
@@ -241,7 +317,7 @@ const App: React.FC = () => {
                     </div>
                   </div>
                   
-                  {/* COACH TIP: Display below the message if it exists */}
+                  {/* COACH TIP */}
                   {m.feedback && (
                     <div className="flex justify-center my-2 animate-[fadeIn_0.5s_ease-out]">
                       <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-lg p-2 px-4 flex items-center gap-2 max-w-lg">
@@ -262,18 +338,29 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* REPORT CARD */}
+              {/* PROCTOR PHASE: Survey OR Report */}
               {phase === 'PROCTOR' && (
-                <div className="mt-12 mb-12 animate-[fadeIn_0.5s_ease-out]">
-                    <h2 className="text-center text-xl font-mono text-gray-500 uppercase tracking-widest mb-6">Simulation Result</h2>
+                <div className="mt-6 mb-12">
                     
-                    {loading || !report ? (
+                    {loading && (
                       <div className="bg-gray-800 rounded-lg p-12 text-center border border-gray-700">
                         <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                         <p className="text-gray-300 font-mono">Auditing your performance...</p>
                       </div>
-                    ) : (
-                      <div className="bg-white text-gray-900 rounded-xl overflow-hidden shadow-2xl">
+                    )}
+
+                    {!loading && !report && (
+                       <div className="text-center text-red-500">Error loading report. Please try again.</div>
+                    )}
+
+                    {/* Step 1: Survey (If report exists but survey not done) */}
+                    {!loading && report && !surveyData && (
+                      <SurveyForm onSubmit={handleSurveySubmit} />
+                    )}
+
+                    {/* Step 2: Final Report (Only after survey is done) */}
+                    {!loading && report && surveyData && (
+                      <div className="bg-white text-gray-900 rounded-xl overflow-hidden shadow-2xl animate-[fadeIn_0.5s_ease-out]">
                         
                         {/* Header */}
                         <div className={`p-8 text-center ${report.outcome === 'RESOLVED' ? 'bg-emerald-100' : 'bg-red-100'} border-b border-gray-200`}>

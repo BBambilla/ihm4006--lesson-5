@@ -9,7 +9,9 @@ The application is a **Client-Side Single Page Application (SPA)** built with Re
 The app operates in three distinct phases managed by `useState`:
 *   `SELECTION`: User chooses a scenario.
 *   `SIMULATION`: The active loop of Chat <-> AI.
-*   `PROCTOR`: The static results view with PDF export.
+*   `PROCTOR`: The evaluation phase, which contains a sub-state gate:
+    1.  **Survey Gate:** User must complete `SurveyForm`.
+    2.  **Report View:** User sees results and can download PDF.
 
 ### 2. AI Service Layer (`geminiService.ts`)
 We do not use standard "Chat" sessions. Instead, we use a **Functional Request/Response** pattern to enforce game logic.
@@ -41,7 +43,10 @@ App (Main Controller)
 │   │    └── CoachNote (Conditional Feedback Component)
 │   └── InputArea (Form)
 └── Proctor Screen (View)
-    └── PDF Generator (Function)
+    ├── SurveyForm (Gated Component)
+    │    └── LikertScale / TextArea
+    └── ReportView (Conditional Render)
+         └── PDF Generator (Function via jspdf)
 ```
 
 ## Data Flow Diagram
@@ -58,11 +63,16 @@ App (Main Controller)
 6.  **State Update:**
     *   `setAngerLevel(newLevel)` -> Triggers Animation.
     *   `setMessages(...)` -> Updates Chat UI with new Coach Note.
-    *   `checkStatus(...)` -> If failed/resolved, switch Phase.
+    *   `checkStatus(...)` -> If failed/resolved, switch Phase to `PROCTOR`.
+7.  **Survey Gate:**
+    *   App checks `surveyData` state.
+    *   If null, renders `<SurveyForm />`.
+    *   User Submit -> Triggers `mailto:` -> Sets `surveyData` -> Renders Report.
 
 ## Client-Side Reporting
 *   **PDF Generation:** We use `jspdf` and `jspdf-autotable`.
-*   **Logic:** The `ReportData` JSON returned by Gemini in the Proctor phase is mapped directly to table rows in the PDF. This happens entirely in the browser; no server is required.
+*   **Logic:** The `ReportData` JSON returned by Gemini + `SurveyData` collected from the user are combined to create a multi-page PDF.
+*   **Email:** Uses client-side `mailto:` generation to open the user's default email client with pre-filled survey data.
 
 ## Security & Stability
 *   **Markdown Stripping:** A helper function `parseJSON` specifically strips markdown code fences to prevent JSON parse errors.
