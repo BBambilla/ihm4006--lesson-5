@@ -181,7 +181,7 @@ const parseReportJSON = (text: string | undefined): ReportData => {
 };
 
 // Use gemini-1.5-flash as default model
-const MODEL_NAME = 'gemini-1.5-flash';
+const MODEL_NAME = 'gemini-1.5-flash-001';
 
 export const startSimulation = async (scenarioKey: ScenarioType): Promise<SimulationState> => {
   const scenarioDescription = SCENARIOS[scenarioKey];
