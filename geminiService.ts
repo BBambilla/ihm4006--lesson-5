@@ -1,6 +1,14 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Fix 1: Use process.env.API_KEY as per guidelines.
+// This avoids "Property 'env' does not exist on type 'ImportMeta'" error in strict TS environments
+// and complies with the SDK guidelines.
+const apiKey = process.env.API_KEY || "";
+if (!apiKey) {
+  console.warn("process.env.API_KEY is missing. The app will fail to connect to Gemini.");
+}
+
+const ai = new GoogleGenAI({ apiKey });
 
 export type ScenarioType = 
   | 'tech_failure' 
@@ -12,13 +20,13 @@ export interface SimulationState {
   thought_process: string;
   anger_level: number; // 0-10
   spoken_response: string;
-  instant_feedback: string | null; // New field for real-time coaching
+  instant_feedback: string | null;
   status: 'active' | 'failed' | 'resolved';
 }
 
 export interface AuditItem {
   step_code: string; // L, E, A, R, N
-  step_name: string; // Listen, Empathize...
+  step_name: string;
   status: 'Pass' | 'Fail';
   feedback: string;
 }
@@ -65,7 +73,7 @@ TERMINATION:
 CRITICAL: You must ALWAYS output a valid JSON object. No Markdown. No introduction text.
 `;
 
-const simulationSchema = {
+const simulationSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     thought_process: { type: Type.STRING, description: "Analyze the student's input based on LEARN model." },
@@ -77,7 +85,7 @@ const simulationSchema = {
   required: ["thought_process", "anger_level", "spoken_response", "status"]
 };
 
-const reportSchema = {
+const reportSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     scenario: { type: Type.STRING },
@@ -102,50 +110,72 @@ const reportSchema = {
   required: ["scenario", "outcome", "final_anger", "score", "summary", "audit"]
 };
 
-// Generic JSON Extractor
-const extractJSON = (text: string): string => {
+// Fix 3: Safe JSON Extractor
+const extractJSON = (text: string | undefined | null): string => {
+  if (!text) return "{}";
+  
   const firstBrace = text.indexOf('{');
   const lastBrace = text.lastIndexOf('}');
 
   if (firstBrace === -1 || lastBrace === -1) {
-    throw new Error("No JSON object found.");
+    // If no JSON structure is found, return empty object to prevent crash,
+    // but log error so we know the AI hallucinated.
+    console.error("No JSON object found in response:", text);
+    return "{}";
   }
   return text.substring(firstBrace, lastBrace + 1);
 };
 
-const parseSimulationJSON = (text: string): SimulationState => {
+const parseSimulationJSON = (text: string | undefined): SimulationState => {
   try {
     const cleanText = extractJSON(text);
     const parsed = JSON.parse(cleanText);
     
-    // Runtime validation
-    if (typeof parsed.anger_level !== 'number' || !parsed.spoken_response) {
-      throw new Error("Missing required fields in AI response");
+    // Validating essential fields to prevent UI crashes
+    if (Object.keys(parsed).length === 0) {
+       throw new Error("Empty JSON received");
     }
-    return parsed;
+    
+    return {
+      thought_process: parsed.thought_process || "Processing error...",
+      anger_level: typeof parsed.anger_level === 'number' ? parsed.anger_level : 10,
+      spoken_response: parsed.spoken_response || "System Error: Please try again.",
+      instant_feedback: parsed.instant_feedback || null,
+      status: parsed.status || 'active'
+    };
   } catch (e) {
     console.error("JSON Parse Error:", e, "Input text:", text);
-    throw e;
+    // Fallback state
+    return {
+      thought_process: "Error parsing AI response",
+      anger_level: 10,
+      spoken_response: "I'm having trouble connecting! (System Error)",
+      instant_feedback: null,
+      status: 'active'
+    };
   }
 };
 
-const parseReportJSON = (text: string): ReportData => {
+const parseReportJSON = (text: string | undefined): ReportData => {
   try {
     const cleanText = extractJSON(text);
-    return JSON.parse(cleanText);
+    const parsed = JSON.parse(cleanText);
+    return parsed;
   } catch (e) {
     console.error("Report Parse Error:", e);
-    // Fallback report
     return {
       scenario: "Unknown",
       outcome: "FAILED",
       final_anger: 10,
       score: 0,
-      summary: "Error generating report.",
+      summary: "Error generating report. The AI response was not valid JSON.",
       audit: []
     };
   }
 };
+
+// Fix: Use gemini-2.5-flash as default model (gemini-1.5-flash is prohibited/deprecated in guidelines)
+const MODEL_NAME = 'gemini-2.5-flash';
 
 export const startSimulation = async (scenarioKey: ScenarioType): Promise<SimulationState> => {
   const scenarioDescription = SCENARIOS[scenarioKey];
@@ -162,7 +192,7 @@ export const startSimulation = async (scenarioKey: ScenarioType): Promise<Simula
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL_NAME,
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -171,13 +201,13 @@ export const startSimulation = async (scenarioKey: ScenarioType): Promise<Simula
       }
     });
 
-    return parseSimulationJSON(response.text || '{}');
+    return parseSimulationJSON(response.text);
   } catch (error) {
     console.error("Simulation Start Error:", error);
     return {
-      thought_process: "System Error during start.",
+      thought_process: "Connection Error",
       anger_level: 9,
-      spoken_response: "I CAN'T BELIEVE THIS SYSTEM IS BROKEN TOO! (AI Connection Error. Please 'Change Scenario' and try again.)",
+      spoken_response: "I CAN'T BELIEVE THIS SYSTEM IS BROKEN TOO! (AI Connection Error. Please check your API Key.)",
       instant_feedback: null,
       status: 'active'
     };
@@ -212,7 +242,7 @@ export const sendStudentResponse = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL_NAME,
       contents: [...historyContent, { role: 'user', parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -221,13 +251,13 @@ export const sendStudentResponse = async (
       }
     });
 
-    return parseSimulationJSON(response.text || '{}');
+    return parseSimulationJSON(response.text);
   } catch (error) {
     console.error("Simulation Loop Error:", error);
     return {
-      thought_process: "System Error during loop.",
+      thought_process: "Connection Error",
       anger_level: currentAnger,
-      spoken_response: "What did you say? Speak up! (AI Connection Error. Please try your response again.)",
+      spoken_response: "What did you say? Speak up! (AI Connection Error. Please try again.)",
       instant_feedback: "Error processing feedback.",
       status: 'active'
     };
@@ -256,7 +286,7 @@ export const generateProctorReport = async (chatHistory: any[]): Promise<ReportD
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: MODEL_NAME,
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -264,7 +294,7 @@ export const generateProctorReport = async (chatHistory: any[]): Promise<ReportD
         responseSchema: reportSchema
       }
     });
-    return parseReportJSON(response.text || '{}');
+    return parseReportJSON(response.text);
   } catch (error) {
     console.error("Report Generation Error:", error);
     return {
@@ -272,7 +302,7 @@ export const generateProctorReport = async (chatHistory: any[]): Promise<ReportD
         outcome: "FAILED",
         final_anger: 0,
         score: 0,
-        summary: "Could not generate report.",
+        summary: "Could not generate report due to AI connection error.",
         audit: []
     };
   }
