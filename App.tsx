@@ -20,6 +20,9 @@ interface Message {
   feedback?: string | null; // Added feedback field
 }
 
+// Key for saving data to browser local storage
+const STORAGE_KEY = 'recovery_room_surveys';
+
 const App: React.FC = () => {
   const [phase, setPhase] = useState<Phase>('SELECTION');
   const [scenario, setScenario] = useState<ScenarioType | null>(null);
@@ -107,28 +110,75 @@ const App: React.FC = () => {
     setSurveyData(null);
   };
 
-  const sendSurveyToInstructor = (data: SurveyData) => {
-    const subject = "Recovery Room Survey Completion";
-    const body = `
-Student Survey Responses:
--------------------------
-1. Strategic Thinking: ${data.q1}/5
-2. Epistemic Vigilance: ${data.q2}/5
-3. Intellectual Autonomy: ${data.q3}/5
-4. Perceived Usefulness: ${data.q4}/5
-5. Perceived Ease of Use: ${data.q5}/5
+  // --- NEW: STORAGE & EXPORT LOGIC ---
 
-REFLECTION:
-${data.q6}
-    `.trim();
+  const saveSurveyToStorage = (data: SurveyData) => {
+    const existingDataStr = localStorage.getItem(STORAGE_KEY);
+    const existingData = existingDataStr ? JSON.parse(existingDataStr) : [];
     
-    // Construct mailto link
-    // Note: window.location.href is standard for triggering mail clients without opening a blank tab
-    window.location.href = `mailto:bbambilla@arden.ac.uk?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const record = {
+      timestamp: new Date().toISOString(),
+      scenario: report?.scenario || 'Unknown',
+      outcome: report?.outcome || 'Unknown',
+      score: report?.score || 0,
+      ...data
+    };
+
+    const newData = [...existingData, record];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
   };
 
+  const downloadClassData = () => {
+    const existingDataStr = localStorage.getItem(STORAGE_KEY);
+    if (!existingDataStr) {
+      alert("No data collected yet.");
+      return;
+    }
+    const data = JSON.parse(existingDataStr);
+    
+    if (data.length === 0) {
+      alert("No records found.");
+      return;
+    }
+
+    // Convert JSON to CSV
+    const headers = [
+      "Timestamp", "Scenario", "Outcome", "Score", 
+      "Strategic Thinking (Q1)", "Epistemic Vigilance (Q2)", "Intellectual Autonomy (Q3)", "Usefulness (Q4)", "Ease of Use (Q5)", 
+      "Reflection (Q6)", "Feedback (Q7)"
+    ];
+    
+    const csvRows = [headers.join(",")];
+    
+    data.forEach((row: any) => {
+      // Escape quotes for CSV format
+      const safeText = (text: string) => `"${(text || '').replace(/"/g, '""')}"`;
+      
+      const values = [
+        safeText(row.timestamp),
+        safeText(row.scenario),
+        safeText(row.outcome),
+        row.score,
+        row.q1, row.q2, row.q3, row.q4, row.q5,
+        safeText(row.q6),
+        safeText(row.q7)
+      ];
+      csvRows.push(values.join(","));
+    });
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `RecoveryRoom_ClassData_${new Date().getTime()}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // --- SUBMIT HANDLER ---
+
   const handleSurveySubmit = (data: SurveyData) => {
-    sendSurveyToInstructor(data);
+    saveSurveyToStorage(data);
     setSurveyData(data);
   };
 
@@ -246,6 +296,18 @@ ${data.q6}
       doc.setTextColor(60, 60, 60);
       const reflectionLines = doc.splitTextToSize(surveyData.q6, 180);
       doc.text(reflectionLines, 14, yPos);
+      
+      yPos += (reflectionLines.length * 5) + 10;
+      
+      // ADDED Q7 TO PDF
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("7. Honest Feedback:", 14, yPos);
+      yPos += 7;
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(60, 60, 60);
+      const feedbackLines = doc.splitTextToSize(surveyData.q7, 180);
+      doc.text(feedbackLines, 14, yPos);
     }
 
     // 6. Footer
@@ -266,7 +328,20 @@ ${data.q6}
       <LearnReference />
 
       {phase === 'SELECTION' ? (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-900 text-gray-100">
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-900 text-gray-100 relative">
+          
+          {/* INSTRUCTOR / DATA EXPORT BUTTON */}
+          <div className="absolute top-6 right-6">
+            <button 
+              onClick={downloadClassData}
+              className="text-xs font-mono text-gray-600 hover:text-emerald-500 transition-colors flex items-center gap-2 border border-gray-800 p-2 rounded hover:border-emerald-500"
+              title="Download accumulated survey data from this device (CSV)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              Export Data (CSV)
+            </button>
+          </div>
+
           <div className="max-w-2xl w-full text-center mb-12">
             <h1 className="text-4xl font-bold mb-4 tracking-tight text-emerald-400">THE RECOVERY ROOM</h1>
             <p className="text-gray-400 text-lg">Hospitality Service Recovery Simulator (LEARN Model)</p>

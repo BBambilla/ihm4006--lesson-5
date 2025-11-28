@@ -9,8 +9,8 @@
 *   [x] **Real-time Feedback:** Implemented "Coach's Note" for instant tips after every turn.
 *   [x] **Professional Reporting:** Structured table output with PDF Download capability.
 *   [x] **Navigation:** Added "Change Scenario" back button functionality.
-*   [x] **Impact Survey:** Implemented mandatory self-reflection gateway with Likert scale and open-ended questions.
-*   [x] **Instructor Notification:** Added `mailto` integration to send survey results to the lecturer.
+*   [x] **Impact Survey:** Implemented mandatory self-reflection gateway with Likert scale and open-ended questions (Q1-Q7).
+*   [x] **Data Persistence:** Replaced Email notification with LocalStorage + CSV Export for classroom "Kiosk" support.
 
 ## 🚧 Phase 2: UX Refinements (Current Focus)
 *   [ ] **Voice Input:** Allow students to speak their responses using the Web Speech API (Simulate real phone calls).
@@ -19,7 +19,7 @@
 *   [ ] **Scenario Randomizer:** A "Quick Play" button that picks a random scenario.
 
 ## 🔮 Phase 3: Advanced Features (Future)
-*   **Teacher Dashboard:** A backend integration (Firebase/Supabase) to save student reports automatically (replacing the manual email).
+*   **Teacher Dashboard:** A real backend integration (Firebase/Supabase) to save student reports to a cloud database (replacing the current LocalStorage CSV method).
 *   **Gemini Live Integration:** Upgrade from text-based chat to full low-latency audio streaming for a realistic "angry phone call" simulation.
 *   **Custom Scenario Builder:** Allow instructors to upload their own scenarios via a text configuration.
 *   **Leaderboard:** "Fastest De-escalation" times.

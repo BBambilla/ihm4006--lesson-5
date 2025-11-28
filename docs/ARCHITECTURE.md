@@ -37,6 +37,7 @@ interface SimulationState {
 App (Main Controller)
 ├── LearnReference (Overlay Component - Responsive)
 ├── Selection Screen (View)
+│    └── CSV Export Button (Instructor Tool)
 ├── Simulation Screen (Container)
 │   ├── AngerMeter (Visual Component - Sticky Header)
 │   ├── ChatList (Scrollable View)
@@ -67,14 +68,15 @@ App (Main Controller)
 7.  **Survey Gate:**
     *   App checks `surveyData` state.
     *   If null, renders `<SurveyForm />`.
-    *   User Submit -> Triggers `mailto:` -> Sets `surveyData` -> Renders Report.
+    *   User Submit -> **Saves to LocalStorage** -> Sets `surveyData` -> Renders Report.
 
-## Client-Side Reporting
-*   **PDF Generation:** We use `jspdf` and `jspdf-autotable`.
-*   **Logic:** The `ReportData` JSON returned by Gemini + `SurveyData` collected from the user are combined to create a multi-page PDF.
-*   **Email:** Uses client-side `mailto:` generation to open the user's default email client with pre-filled survey data.
+## Client-Side Reporting & Persistence
+*   **PDF Generation:** We use `jspdf` and `jspdf-autotable`. The PDF is generated entirely in the browser using the simulation results + survey inputs.
+*   **Local Persistence:** When a student submits the survey, the data is appended to a JSON array stored in `localStorage` under the key `recovery_room_surveys`.
+*   **CSV Export:** A "Download Data" button on the home screen retrieves this local storage array, converts it to CSV format, and triggers a browser download. This is designed for "Kiosk Mode" (e.g., a shared tablet in a classroom).
 
 ## Security & Stability
 *   **Markdown Stripping:** A helper function `parseJSON` specifically strips markdown code fences to prevent JSON parse errors.
 *   **Input Validation:** The UI prevents empty submissions.
 *   **API Key:** Handled via `process.env.API_KEY` (Standard Google GenAI SDK practice).
+*   **Deployment:** Configured with `Dockerfile` and `serve` for Google Cloud Run compatibility.

@@ -16,11 +16,15 @@ The application simulates a high-stakes service recovery scenario. The AI acts a
     *   **Red (8-10):** Danger/Irate.
 *   **💡 Instant Coaching:** The AI provides a short "Coach's Note" after every message, giving immediate feedback on the specific LEARN step used (or missed).
 *   **📝 Interactive LEARN Reference:** A responsive cheat sheet available at all times (Side panel on desktop, Toggle on mobile).
-*   **🧠 Metacognitive Impact Survey:** A mandatory self-reflection gateway that ensures students evaluate their own critical thinking, strategic planning, and autonomy before receiving their grade.
+*   **🧠 Metacognitive Impact Survey:** A mandatory self-reflection gateway.
+    *   Includes 5 Likert-scale questions on critical thinking and autonomy.
+    *   Includes 2 Open-ended questions for specific reflection and general feedback.
 *   **📊 Professional Reporting:** 
     *   Detailed "Pass/Fail" audit for each step of the LEARN model.
-    *   **PDF Export:** Students can download a branded, professional PDF report for their portfolio.
-    *   **Instructor Notification:** Automatically generates an email with the student's survey results for assessment.
+    *   **PDF Export:** Students can download a branded, professional PDF report for their portfolio (includes survey answers).
+*   **💾 Kiosk Mode & Data Export:**
+    *   **Local Persistence:** All survey results are saved to the browser's local storage.
+    *   **Instructor CSV Export:** Instructors can download a consolidated CSV file of all student attempts from the home screen.
 
 ## 🛠 Tech Stack
 
@@ -29,6 +33,7 @@ The application simulates a high-stakes service recovery scenario. The AI acts a
 *   **AI Engine:** Google Gemini API (`gemini-2.5-flash`)
 *   **Data Validation:** Strict JSON Schema for state control
 *   **Document Generation:** `jspdf` & `jspdf-autotable` (Client-side PDF creation)
+*   **Deployment:** Docker / Google Cloud Run compatible
 
 ## 🏁 Scenarios
 
@@ -45,3 +50,4 @@ The application simulates a high-stakes service recovery scenario. The AI acts a
 4.  Watch the Anger Meter. If it hits 0-1, you win. If it stays at 10 too long, you fail.
 5.  **Debrief:** Complete the mandatory Impact Survey to reflect on your strategy.
 6.  **Review & Export:** Download your Official Simulation Report PDF at the end.
+7.  **(Instructor Only):** Click "Export Data (CSV)" on the home screen to retrieve class results.
