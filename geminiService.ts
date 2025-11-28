@@ -2,10 +2,16 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 
 // The vite.config.ts file explicitly defines 'process.env.API_KEY'.
 // We must use that accessor to retrieve the key injected at build time.
-const apiKey = import.meta.env?.VITE_API_KEY || "";
+let apiKey = "";
+try {
+  // @ts-ignore
+  apiKey = import.meta.env.VITE_API_KEY || "";
+} catch (e) {
+  console.warn("Running in non-Vite environment");
+}
 
 if (!apiKey) {
-  console.error("API_KEY is missing. Check Vercel/Cloud Run Environment Variables.");
+  console.error("VITE_API_KEY is missing (Expected in Preview, Fatal on Vercel)");
 }
 
 const ai = new GoogleGenAI({ apiKey });
