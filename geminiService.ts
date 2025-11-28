@@ -1,12 +1,11 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 
-// Fix 1: Use process.env.API_KEY as per guidelines.
-// This avoids "Property 'env' does not exist on type 'ImportMeta'" error in strict TS environments
-// and complies with the SDK guidelines.
-const apiKey = import.meta.env.VITE_API_KEY || "";
+// The vite.config.ts file explicitly defines 'process.env.API_KEY'.
+// We must use that accessor to retrieve the key injected at build time.
+const apiKey = import.meta.env?.VITE_API_KEY || "";
 
 if (!apiKey) {
-  console.error("VITE_API_KEY is missing. Check Vercel Environment Variables.");
+  console.error("API_KEY is missing. Check Vercel/Cloud Run Environment Variables.");
 }
 
 const ai = new GoogleGenAI({ apiKey });
@@ -111,7 +110,7 @@ const reportSchema: Schema = {
   required: ["scenario", "outcome", "final_anger", "score", "summary", "audit"]
 };
 
-// Fix 3: Safe JSON Extractor
+// Safe JSON Extractor
 const extractJSON = (text: string | undefined | null): string => {
   if (!text) return "{}";
   
@@ -175,7 +174,7 @@ const parseReportJSON = (text: string | undefined): ReportData => {
   }
 };
 
-// Fix: Use gemini-2.5-flash as default model (gemini-1.5-flash is prohibited/deprecated in guidelines)
+// Use gemini-1.5-flash as default model
 const MODEL_NAME = 'gemini-1.5-flash';
 
 export const startSimulation = async (scenarioKey: ScenarioType): Promise<SimulationState> => {
