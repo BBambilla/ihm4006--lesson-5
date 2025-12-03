@@ -1,17 +1,11 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 
-// The vite.config.ts file explicitly defines 'process.env.API_KEY'.
-// We must use that accessor to retrieve the key injected at build time.
-let apiKey = "";
-try {
-  // @ts-ignore
-  apiKey = import.meta.env.VITE_API_KEY || "";
-} catch (e) {
-  console.warn("Running in non-Vite environment");
-}
+// The vite.config.ts file explicitly replaces 'process.env.API_KEY' with the actual key string during build.
+// We do not need import.meta.env here because of the 'define' block in vite.config.ts.
+const apiKey = process.env.API_KEY || "";
 
 if (!apiKey) {
-  console.error("VITE_API_KEY is missing (Expected in Preview, Fatal on Vercel)");
+  console.error("API_KEY is missing. Please check your .env file or Vercel Environment Variables.");
 }
 
 const ai = new GoogleGenAI({ apiKey });
@@ -180,8 +174,8 @@ const parseReportJSON = (text: string | undefined): ReportData => {
   }
 };
 
-// Use gemini-1.5-flash as default model
-const MODEL_NAME = 'gemini-1.5-flash-001';
+// Use gemini-2.5-flash as requested
+const MODEL_NAME = 'gemini-2.5-flash';
 
 export const startSimulation = async (scenarioKey: ScenarioType): Promise<SimulationState> => {
   const scenarioDescription = SCENARIOS[scenarioKey];

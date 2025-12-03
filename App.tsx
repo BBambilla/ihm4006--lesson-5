@@ -121,7 +121,7 @@ const App: React.FC = () => {
       scenario: report?.scenario || 'Unknown',
       outcome: report?.outcome || 'Unknown',
       score: report?.score || 0,
-      ...data
+      ...data // This spreads q1..q7
     };
 
     const newData = [...existingData, record];
@@ -141,27 +141,31 @@ const App: React.FC = () => {
       return;
     }
 
-    // Convert JSON to CSV
+    // Convert JSON to CSV with explicit mapping for all 7 questions
     const headers = [
       "Timestamp", "Scenario", "Outcome", "Score", 
       "Strategic Thinking (Q1)", "Epistemic Vigilance (Q2)", "Intellectual Autonomy (Q3)", "Usefulness (Q4)", "Ease of Use (Q5)", 
-      "Reflection (Q6)", "Feedback (Q7)"
+      "Reflection (Q6)", "Honest Feedback (Q7)"
     ];
     
     const csvRows = [headers.join(",")];
     
     data.forEach((row: any) => {
-      // Escape quotes for CSV format
-      const safeText = (text: string) => `"${(text || '').replace(/"/g, '""')}"`;
+      // Helper to handle commas/quotes in text fields and ensure undefined becomes empty string
+      const safeText = (text: any) => `"${(text || '').toString().replace(/"/g, '""')}"`;
       
       const values = [
         safeText(row.timestamp),
         safeText(row.scenario),
         safeText(row.outcome),
         row.score,
-        row.q1, row.q2, row.q3, row.q4, row.q5,
+        row.q1 || 0, 
+        row.q2 || 0, 
+        row.q3 || 0, 
+        row.q4 || 0, 
+        row.q5 || 0,
         safeText(row.q6),
-        safeText(row.q7)
+        safeText(row.q7) // Ensure Q7 is captured
       ];
       csvRows.push(values.join(","));
     });
@@ -170,7 +174,7 @@ const App: React.FC = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `RecoveryRoom_ClassData_${new Date().getTime()}.csv`;
+    a.download = `RecoveryRoom_ClassData_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
